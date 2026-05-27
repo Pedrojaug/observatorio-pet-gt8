@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Note: Alte Haas Grotesk is a custom font, so we use a fallback if the webfont is not available. 
+   Ideally, the font files (.woff, .woff2) would be loaded via @font-face */
+
+:root {
+  --font-body: 'Alte Haas Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Alte Haas Grotesk', 'Inter', sans-serif;
+  --font-accent: 'Alte Haas Grotesk', 'Inter', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: 0.02em;
+}
