@@ -42,6 +42,7 @@ export function Locator() {
   const [selectedMunicipio, setSelectedMunicipio] = useState<string>('João Pessoa');
   const [selectedBairro, setSelectedBairro] = useState<string>('');
   const [selectedBairroSearch, setSelectedBairroSearch] = useState<string>('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Local state for manual filter search on results screen
   const [resultSearchTerm, setResultSearchTerm] = useState("");
@@ -296,38 +297,63 @@ export function Locator() {
                 </div>
               </div>
 
-              {/* Bairro Filter and Dropdown */}
+              {/* Bairro Autocomplete Selector */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700">Seu Bairro</label>
                 
-                {/* Search field for filter */}
-                <div className="relative mb-2">
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input 
                     type="text"
-                    placeholder="Filtrar bairro por nome..."
+                    placeholder="Digite seu bairro (ex: Bessa, Torre, Miramar...)"
                     value={selectedBairroSearch}
-                    onChange={(e) => setSelectedBairroSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 h-11 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                    onChange={(e) => {
+                      setSelectedBairroSearch(e.target.value);
+                      setSelectedBairro(''); // Clear selected neighborhood as user is typing
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => {
+                      // Small delay to allow click event on suggestions to be registered before closing
+                      setTimeout(() => setShowSuggestions(false), 200);
+                    }}
+                    className="w-full pl-10 pr-4 h-12 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                   />
+
+                  {/* Suggestions Dropdown */}
+                  {showSuggestions && (
+                    <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      {filteredBairros.length > 0 ? (
+                        filteredBairros.map((b) => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBairro(b);
+                              setSelectedBairroSearch(b); // Populate input with selected neighborhood
+                              setShowSuggestions(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between font-semibold ${selectedBairro === b ? 'bg-primary/5 text-primary' : 'text-slate-700 hover:bg-slate-50 hover:text-primary'}`}
+                          >
+                            <span>{b}</span>
+                            <MapPin className={`w-3.5 h-3.5 ${selectedBairro === b ? 'text-primary' : 'text-slate-300'}`} />
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-xs text-slate-500">
+                          Nenhum bairro encontrado para {selectedMunicipio}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Dropdown list */}
-                <select
-                  value={selectedBairro}
-                  onChange={(e) => setSelectedBairro(e.target.value)}
-                  className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm cursor-pointer"
-                >
-                  <option value="">Selecione o bairro na lista...</option>
-                  {filteredBairros.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-
-                <p className="text-[11px] text-slate-400">
-                  Total de bairros disponíveis para {selectedMunicipio}: {availableBairros.length}
+                <p className="text-[11px] text-slate-450 italic">
+                  {selectedBairro ? (
+                    <span className="text-emerald-600 font-semibold">Bairro "{selectedBairro}" selecionado com sucesso!</span>
+                  ) : (
+                    <span>Comece a digitar para ver os bairros ou selecione na lista acima.</span>
+                  )}
                 </p>
               </div>
 
