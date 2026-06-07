@@ -308,15 +308,22 @@ export function Locator() {
                     placeholder="Digite seu bairro (ex: Bessa, Torre, Miramar...)"
                     value={selectedBairroSearch}
                     onChange={(e) => {
-                      setSelectedBairroSearch(e.target.value);
-                      setSelectedBairro(''); // Clear selected neighborhood as user is typing
+                      const val = e.target.value;
+                      setSelectedBairroSearch(val);
+                      
+                      // Auto-select if there is an exact match (case-insensitive)
+                      const match = availableBairros.find(
+                        (b) => b.trim().toLowerCase() === val.trim().toLowerCase()
+                      );
+                      if (match) {
+                        setSelectedBairro(match);
+                      } else {
+                        setSelectedBairro(''); // Clear selected neighborhood as user is typing
+                      }
                       setShowSuggestions(true);
                     }}
                     onFocus={() => setShowSuggestions(true)}
-                    onBlur={() => {
-                      // Small delay to allow click event on suggestions to be registered before closing
-                      setTimeout(() => setShowSuggestions(false), 200);
-                    }}
+                    onBlur={() => setShowSuggestions(false)}
                     className="w-full pl-10 pr-4 h-12 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                   />
 
@@ -328,7 +335,9 @@ export function Locator() {
                           <button
                             key={b}
                             type="button"
-                            onClick={() => {
+                            onMouseDown={(e) => {
+                              // Prevent input from losing focus immediately (which triggers onBlur)
+                              e.preventDefault();
                               setSelectedBairro(b);
                               setSelectedBairroSearch(b); // Populate input with selected neighborhood
                               setShowSuggestions(false);
