@@ -644,7 +644,7 @@ export function Locator() {
                     <MapPin className="w-5 h-5" /> Seu Atendimento Referenciado
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    Você selecionou **{selectedBairro}** ({selectedMunicipio}). Para cuidados de saúde de rotina e prevenção, dirija-se à Unidade de Saúde da Família (USF) mapeada abaixo. 
+                    Você selecionou <strong className="font-bold text-slate-900">{selectedBairro}</strong> ({selectedMunicipio}). Para cuidados de saúde de rotina e prevenção, dirija-se à Unidade de Saúde da Família (USF) mapeada abaixo. 
                   </p>
                 </div>
 
