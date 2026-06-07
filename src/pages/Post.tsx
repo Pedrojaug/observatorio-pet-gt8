@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import * as DOMPurify from 'dompurify';
+import DOMPurify from 'dompurify';
 
 function renderContent(content: string): string {
   const hasHtml = /<[a-z][\s\S]*>/i.test(content);

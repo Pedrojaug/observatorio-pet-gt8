@@ -18,7 +18,7 @@ export function Layout() {
   const navLinks = [
     { path: "/", label: "Início" },
     { path: "/sobre", label: "Sobre" },
-    /*{ path: "/localizador", label: "Onde ir?" },*/
+    { path: "/localizador", label: "Onde ir?" },
     { path: "/observatorio", label: "Observatório" },
   ];
 
