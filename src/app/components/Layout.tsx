@@ -32,7 +32,7 @@ export function Layout() {
             <Link to="/" className="flex items-center gap-3 group">
               <img 
                 src={logoWhite} 
-                alt="SUS Conectar" 
+                alt="Observatório do GT 8" 
                 className="h-12 w-auto"
               />
             </Link>
@@ -100,7 +100,7 @@ export function Layout() {
             <div className="flex items-center gap-3">
               <img 
                 src={logoWhite} 
-                alt="SUS Conectar" 
+                alt="Observatório do GT 8" 
                 className="h-10 w-auto"
               />
             </div>

@@ -32,7 +32,7 @@ export function About() {
           <div className="inline-flex items-center justify-center p-3.5 bg-white border border-slate-200 shadow-md rounded-[2rem] hover:rotate-6 transition-transform duration-300">
             <img 
               src={logoIcon} 
-              alt="SUS Conectar" 
+              alt="Observatório do GT 8" 
               className="h-20 w-auto"
             />
           </div>
@@ -50,7 +50,7 @@ export function About() {
           >
             Sobre o{" "}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent">
-              SUS Conectar
+              Observatório do GT 8
             </span>
           </h1>
 
@@ -70,7 +70,7 @@ export function About() {
             </h2>
             <div className="space-y-4 text-slate-600 leading-relaxed text-base sm:text-lg">
               <p>
-                O **SUS Conectar** nasceu no âmbito do projeto **PET-Saúde/SUS Digital da Universidade Federal da Paraíba (UFPB)**. Nosso propósito central é aproximar o cidadão das ferramentas tecnológicas e informações de saúde que facilitam o dia a dia.
+                O <strong className="font-bold text-slate-900">Observatório do GT 8</strong> nasceu no âmbito do projeto <strong className="font-bold text-slate-900">PET-Saúde/SUS Digital da Universidade Federal da Paraíba (UFPB)</strong>. Nosso propósito central é aproximar o cidadão das ferramentas tecnológicas e informações de saúde que facilitam o dia a dia.
               </p>
               <p>
                 Acreditamos que o acesso simplificado a informações sobre unidades físicas de atendimento (UBS/USF) e a desmistificação de notícias falsas são fundamentais para promover uma saúde preventiva de qualidade. Orientamos o usuário de forma transparente, humanizada e baseada em evidências científicas sólidas.

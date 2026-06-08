@@ -199,7 +199,7 @@ export function Home() {
                     <span className="w-3.5 h-3.5 rounded-full bg-slate-200 group-hover:bg-green-400 transition-colors" />
                   </div>
                   <span className="text-xs font-bold text-slate-400 group-hover:text-primary transition-colors uppercase tracking-widest">
-                    SUS CONECTAR HUB
+                    OBSERVATÓRIO DO GT 8
                   </span>
                 </div>
 
@@ -207,7 +207,7 @@ export function Home() {
                 <div className="mb-6 flex justify-center bg-gradient-to-br from-secondary/5 to-primary/5 p-4 rounded-2xl border border-slate-100">
                   <img 
                     src={logoFull} 
-                    alt="SUS Conectar" 
+                    alt="Observatório do GT 8" 
                     className="w-full max-w-[200px] h-auto drop-shadow-md"
                   />
                 </div>
@@ -296,7 +296,7 @@ export function Home() {
               Como podemos ajudar você?
             </h2>
             <p className="text-lg text-slate-600">
-              O SUS Conectar integra informação, orientação espacial e embasamento científico para facilitar sua relação com o ecossistema de saúde.
+              O Observatório do GT 8 integra informação, orientação espacial e embasamento científico para facilitar sua relação com o ecossistema de saúde.
             </p>
           </div>
 
@@ -463,7 +463,7 @@ export function Home() {
               Dúvidas Frequentes
             </h2>
             <p className="text-lg text-slate-600">
-              Tudo o que você precisa saber sobre o portal SUS Conectar e a atuação do PET-Saúde/SUS Digital.
+              Tudo o que você precisa saber sobre o Observatório do GT 8 e a atuação do PET-Saúde/SUS Digital.
             </p>
           </div>
 
