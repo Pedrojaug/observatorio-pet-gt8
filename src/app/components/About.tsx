@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import logoIcon from "../../imports/Avatar_PET_Saude.png";
+import { Button } from "./ui/button";
 
 export function About() {
   return (
