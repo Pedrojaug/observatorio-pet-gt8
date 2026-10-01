@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Search, 
   MapPin, 
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import initialHealthUnits from "./unidades_selecionadas.json";
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -58,7 +59,8 @@ interface HealthUnit {
 }
 
 export function Locator() {
-  const [healthUnits, setHealthUnits] = useState<HealthUnit[]>([]);
+  // Inicialização instantânea com os dados locais, garantindo zero atraso
+  const [healthUnits, setHealthUnits] = useState<HealthUnit[]>(initialHealthUnits as HealthUnit[]);
 
   // Navigation steps: 'triage' | 'location' | 'results'
   const [step, setStep] = useState<'triage' | 'location' | 'results'>('triage');
@@ -69,6 +71,7 @@ export function Locator() {
   const [selectedBairro, setSelectedBairro] = useState<string>('');
   const [selectedBairroSearch, setSelectedBairroSearch] = useState<string>('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [cepInput, setCepInput] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
 
   // Local state for manual filter search on results screen
@@ -76,10 +79,12 @@ export function Locator() {
   // Local state to filter UPAs by municipality on UPA screen
   const [upaFilterMunicipio, setUpaFilterMunicipio] = useState<string>("Todos");
 
-  // Busca do Banco (Supabase) em vez do JSON
-  useMemo(() => {
-    supabase.from('health_units').select('*').then(({ data }) => {
-      if (data) setHealthUnits(data);
+  // Sincroniza dados com o Supabase em segundo plano
+  useEffect(() => {
+    supabase.from('health_units').select('*').then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        setHealthUnits(data as HealthUnit[]);
+      }
     });
   }, []);
 
@@ -109,7 +114,7 @@ export function Locator() {
       }
     });
     return Array.from(bairrosSet).sort();
-  }, [selectedMunicipio]);
+  }, [selectedMunicipio, healthUnits]);
 
   // Filter neighborhoods based on search input
   const filteredBairros = useMemo(() => {
@@ -141,8 +146,134 @@ export function Locator() {
       setStep('location');
       setSelectedBairro('');
       setSelectedBairroSearch('');
+      setCepInput('');
     } else {
       setStep('results');
+    }
+  };
+
+  // Busca por GPS precisa e auto-redirecionamento imediato
+  const handleGpsSearch = () => {
+    if (!("geolocation" in navigator)) {
+      toast.error("Seu navegador não possui suporte a geolocalização.");
+      return;
+    }
+
+    toast.promise(
+      new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            try {
+              const { latitude, longitude } = pos.coords;
+              let nearest: HealthUnit | null = null;
+              let minDistance = Infinity;
+
+              for (const unit of healthUnits) {
+                if (unit.latitude && unit.longitude) {
+                  const lat = parseFloat(unit.latitude);
+                  const lng = parseFloat(unit.longitude);
+                  if (!isNaN(lat) && !isNaN(lng)) {
+                    const d = Math.hypot(lat - latitude, lng - longitude);
+                    if (d < minDistance) {
+                      minDistance = d;
+                      nearest = unit;
+                    }
+                  }
+                }
+              }
+
+              if (nearest && nearest.bairro) {
+                const normBairro = normalizeString(nearest.bairro);
+                setSelectedMunicipio(nearest.municipio);
+                setSelectedBairro(normBairro);
+                setSelectedBairroSearch(nearest.bairro);
+                setStep('results');
+                resolve(`Bairro ${nearest.bairro} localizado com sucesso!`);
+              } else {
+                reject("Nenhuma unidade de saúde encontrada próxima.");
+              }
+            } catch {
+              reject("Erro ao processar as coordenadas.");
+            }
+          },
+          (err) => {
+            if (err.code === err.PERMISSION_DENIED) {
+              reject("Permissão de GPS negada no navegador.");
+            } else {
+              reject("Não foi possível obter sua localização GPS.");
+            }
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        );
+      }),
+      {
+        loading: 'Buscando sua localização pelo GPS...',
+        success: (msg: any) => msg,
+        error: (err: any) => err,
+      }
+    );
+  };
+
+  // Busca por CEP com preenchimento inteligente e auto-redirecionamento imediato
+  const handleCepSearch = async (val: string) => {
+    const cleanCep = val.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
+      setCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await res.json();
+
+        if (data.erro) {
+          toast.error("CEP não encontrado.");
+          return;
+        }
+
+        if (data.bairro) {
+          const city = data.localidade?.trim() || "";
+          let mun = selectedMunicipio;
+          if (city.toLowerCase().includes("cabedelo")) {
+            mun = "Cabedelo";
+          } else if (city.toLowerCase().includes("joao pessoa") || city.toLowerCase().includes("joão pessoa")) {
+            mun = "João Pessoa";
+          }
+          setSelectedMunicipio(mun);
+
+          const normCepBairro = normalizeString(data.bairro);
+
+          const bairrosDisponiveis = Array.from(
+            new Set(
+              healthUnits
+                .filter(u => u.municipio === mun && u.tipo === 'USF' && u.bairro)
+                .map(u => normalizeString(u.bairro))
+            )
+          );
+
+          let matchedBairro = bairrosDisponiveis.find(b => b === normCepBairro);
+          if (!matchedBairro) {
+            matchedBairro = bairrosDisponiveis.find(b => b.includes(normCepBairro) || normCepBairro.includes(b));
+          }
+
+          if (!matchedBairro) {
+            const unitMatch = healthUnits.find(u => u.tipo === 'USF' && normalizeString(u.bairro).includes(normCepBairro));
+            if (unitMatch) {
+              matchedBairro = normalizeString(unitMatch.bairro);
+              setSelectedMunicipio(unitMatch.municipio);
+            }
+          }
+
+          const finalBairro = matchedBairro || normCepBairro;
+          setSelectedBairro(finalBairro);
+          setSelectedBairroSearch(data.bairro);
+          toast.success(`Bairro ${data.bairro} localizado! Redirecionando...`);
+          setStep('results');
+        } else {
+          toast.error("O CEP digitado não possui bairro associado.");
+        }
+      } catch {
+        toast.error("Erro ao buscar informações do CEP.");
+      } finally {
+        setCepLoading(false);
+      }
     }
   };
 
@@ -165,7 +296,7 @@ export function Locator() {
       );
     }
     return [];
-  }, [severity, selectedMunicipio, selectedBairro, resultSearchTerm, upaFilterMunicipio]);
+  }, [severity, selectedMunicipio, selectedBairro, resultSearchTerm, upaFilterMunicipio, healthUnits]);
 
   const renderMap = (units: HealthUnit[]) => {
     if (!units || units.length === 0) return null;
@@ -341,89 +472,54 @@ export function Locator() {
             </div>
 
             {/* GPS & CEP Auto-Locate */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
-              <button 
-                onClick={() => {
-                  if ("geolocation" in navigator) {
-                    toast.promise(
-                      new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(async (pos) => {
-                          try {
-                            const { latitude, longitude } = pos.coords;
-                            // Acha a unidade mais próxima em linha reta
-                            let nearest: HealthUnit | null = null;
-                            let minDistance = Infinity;
-                            for (const unit of healthUnits) {
-                              if (unit.latitude && unit.longitude) {
-                                const d = Math.hypot(parseFloat(unit.latitude) - latitude, parseFloat(unit.longitude) - longitude);
-                                if (d < minDistance) {
-                                  minDistance = d;
-                                  nearest = unit;
-                                }
-                              }
-                            }
-                            if (nearest) {
-                              setSelectedMunicipio(nearest.municipio);
-                              setSelectedBairro(normalizeString(nearest.bairro));
-                              setSelectedBairroSearch(nearest.bairro);
-                              setStep('results');
-                              resolve(`Bairro ${nearest.bairro} localizado pelo seu GPS!`);
-                            } else {
-                              reject("Não localizamos unidades próximas.");
-                            }
-                          } catch (e) {
-                            reject("Erro ao processar localização.");
-                          }
-                        }, () => reject("Permissão negada ou GPS desligado."));
-                      }),
-                      {
-                        loading: 'Buscando sua localização...',
-                        success: (msg: any) => msg,
-                        error: (err: any) => err,
-                      }
-                    );
-                  }
-                }}
-                className="w-full sm:w-auto px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-              >
-                <MapPin className="w-4 h-4" /> Usar meu GPS
-              </button>
+            <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+                <span className="flex items-center gap-1.5">
+                  <Navigation className="w-3.5 h-3.5 text-primary" />
+                  Preenchimento Automático
+                </span>
+                <span className="text-[11px] font-normal text-slate-400">Rápido e sem esforço</span>
+              </div>
 
-              <div className="hidden sm:block text-slate-300">ou</div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Botão GPS */}
+                <button 
+                  type="button"
+                  onClick={handleGpsSearch}
+                  className="h-12 px-5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2.5 transition-all shadow-sm hover:shadow-md hover:shadow-blue-500/20 whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Navigation className="w-4 h-4 text-white fill-white/20 shrink-0" />
+                  <span>Usar meu GPS</span>
+                </button>
 
-              <div className="relative w-full">
-                <input 
-                  type="text"
-                  placeholder="Ou digite seu CEP"
-                  className="w-full h-10 px-4 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-primary/20"
-                  maxLength={9}
-                  onChange={async (e) => {
-                    let val = e.target.value.replace(/\D/g, '');
-                    if (val.length === 8) {
-                      setCepLoading(true);
-                      try {
-                        const res = await fetch(`https://viacep.com.br/ws/${val}/json/`);
-                        const data = await res.json();
-                        if (data.bairro) {
-                          setSelectedBairroSearch(data.bairro);
-                          const match = availableBairros.find(b => normalizeString(b) === normalizeString(data.bairro));
-                          if (match) {
-                            setSelectedBairro(match);
-                            setStep('results');
-                          }
-                          toast.success(`Bairro ${data.bairro} encontrado via CEP!`);
-                        } else {
-                          toast.error("CEP não retornou um bairro válido.");
-                        }
-                      } catch {
-                        toast.error("Erro ao buscar CEP.");
-                      } finally {
-                        setCepLoading(false);
+                <div className="hidden sm:flex items-center justify-center text-xs font-bold text-slate-400 px-1 uppercase tracking-wider">
+                  ou
+                </div>
+
+                {/* Input CEP */}
+                <div className="relative flex-1 min-w-0">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input 
+                    type="text"
+                    placeholder="Digite seu CEP (ex: 58038-000)"
+                    value={cepInput}
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length > 5) {
+                        val = `${val.slice(0, 5)}-${val.slice(5, 8)}`;
                       }
-                    }
-                  }}
-                />
-                {cepLoading && <Activity className="w-4 h-4 text-primary absolute right-3 top-3 animate-spin" />}
+                      setCepInput(val);
+                      if (val.replace(/\D/g, '').length === 8) {
+                        handleCepSearch(val);
+                      }
+                    }}
+                    maxLength={9}
+                    className="w-full h-12 pl-10 pr-10 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+                  />
+                  {cepLoading && (
+                    <Activity className="w-4 h-4 text-primary absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin" />
+                  )}
+                </div>
               </div>
             </div>
 
