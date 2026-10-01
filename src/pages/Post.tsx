@@ -22,6 +22,7 @@ interface PostData {
   gt_origem?: string;
   territorio?: string;
   content?: string;
+  image_url?: string;
 }
 
 export default function Post() {
@@ -164,6 +165,17 @@ export default function Post() {
 
       {/* Main Content */}
       <main className="relative max-w-3xl mx-auto mt-8 px-4 sm:px-6">
+        {/* Foto de Capa (se houver) */}
+        {post.image_url && (
+          <div className="w-full h-64 sm:h-96 rounded-3xl overflow-hidden mb-8 shadow-md border border-slate-200 bg-slate-100">
+            <img 
+              src={post.image_url} 
+              alt={post.title} 
+              className="w-full h-full object-cover" 
+            />
+          </div>
+        )}
+
         <div className="bg-white p-8 md:p-12 rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/40">
           <div className="prose prose-slate prose-lg md:prose-xl max-w-none">
             {/* Resumo destacado */}

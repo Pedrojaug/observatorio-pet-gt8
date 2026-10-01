@@ -287,6 +287,18 @@ export default function Observatorio() {
                   className="group bg-white hover:bg-slate-50/20 border border-slate-200/80 hover:border-primary/20 rounded-3xl p-6 sm:p-7 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
                 >
                   <div>
+                    {/* Foto de Capa (se houver) */}
+                    {item.image_url && (
+                      <div className="w-full h-44 rounded-2xl overflow-hidden mb-4 bg-slate-100 -mt-1 shadow-xs">
+                        <img 
+                          src={item.image_url} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+
                     {/* Tags */}
                     <div className="flex flex-wrap gap-2 mb-4">
                       <span className="text-[10px] font-extrabold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full uppercase tracking-wider">

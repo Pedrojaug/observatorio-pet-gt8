@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLeft, Trash2, Edit3, List as ListIcon, Key, Copy, Plus } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLeft, Trash2, Edit3, List as ListIcon, Key, Copy, Plus, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -15,6 +15,7 @@ interface PostFormData {
   gt_origem: string;
   territorio: string;
   data: string;
+  image_url?: string;
 }
 
 interface ProfileFormData {
@@ -55,6 +56,8 @@ export default function AdminDashboard() {
   const [postsList, setPostsList] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string>('');
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const [session, setSession] = useState<Session | null>(null);
   const [authView, setAuthView] = useState<AuthView>('login');
@@ -216,7 +219,8 @@ export default function AdminDashboard() {
         const { error } = await supabase.from('posts').update({
           title: data.title, summary: data.summary, content: data.content,
           tipo_conteudo: data.tipo_conteudo, gt_origem: data.gt_origem,
-          territorio: data.territorio, data: data.data
+          territorio: data.territorio, data: data.data,
+          image_url: coverImageUrl || null
         }).eq('id', data.id);
         if (error) throw error;
         toast.success('Publicação atualizada com sucesso!');
@@ -224,12 +228,14 @@ export default function AdminDashboard() {
         const { error } = await supabase.from('posts').insert([{
           title: data.title, summary: data.summary, content: data.content,
           tipo_conteudo: data.tipo_conteudo, gt_origem: data.gt_origem,
-          territorio: data.territorio, data: data.data
+          territorio: data.territorio, data: data.data,
+          image_url: coverImageUrl || null
         }]);
         if (error) throw error;
         toast.success('Publicação criada com sucesso!');
       }
       resetPost({ title: '', summary: '', content: '', tipo_conteudo: '', gt_origem: '', territorio: '', data: '' });
+      setCoverImageUrl('');
       setIsEditing(false);
     } catch (err: any) {
       toast.error(err.message || 'Erro ao salvar a publicação.');
@@ -306,8 +312,53 @@ export default function AdminDashboard() {
 
   const handleEditPost = (post: any) => {
     resetPost(post);
+    setCoverImageUrl(post.image_url || '');
     setIsEditing(true);
     setActiveTab('publish');
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione um arquivo de imagem (JPG, PNG, WebP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('A imagem é muito pesada (limite de 10MB).');
+      return;
+    }
+
+    setUploadingCover(true);
+    toast.promise(
+      (async () => {
+        try {
+          const fileExt = file.name.split('.').pop() || 'png';
+          const cleanFileName = `covers/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('post-images')
+            .upload(cleanFileName, file, { cacheControl: '3600', upsert: false });
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('post-images')
+            .getPublicUrl(cleanFileName);
+
+          setCoverImageUrl(publicUrl);
+          return publicUrl;
+        } finally {
+          setUploadingCover(false);
+        }
+      })(),
+      {
+        loading: 'Enviando imagem de capa...',
+        success: 'Imagem de capa carregada!',
+        error: (err) => `Erro ao enviar capa: ${err.message}`
+      }
+    );
   };
 
   // --- Telas de autenticação ---
@@ -642,6 +693,38 @@ export default function AdminDashboard() {
                 <input {...registerPost('territorio')}
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   placeholder="Ex: USF Alto do Céu, Cabedelo..." />
+              </div>
+
+              {/* Foto de Capa (Opcional) */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">Foto de Capa da Publicação (Opcional)</label>
+                <p className="text-xs text-slate-500">
+                  Uma foto principal para ilustrar o card do material no Observatório.
+                </p>
+
+                {coverImageUrl ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 group w-full bg-slate-100 flex items-center justify-center">
+                    <img src={coverImageUrl} alt="Capa da publicação" className="w-full h-48 sm:h-56 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setCoverImageUrl('')}
+                      className="absolute top-3 right-3 bg-red-600/90 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" /> Remover Foto
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-slate-50/60 hover:bg-blue-50/30 transition-all text-center group">
+                    <input type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
+                    <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      {uploadingCover ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">
+                      {uploadingCover ? 'Enviando foto de capa...' : 'Clique para carregar uma foto de capa do computador ou celular'}
+                    </span>
+                    <span className="text-xs text-slate-400">JPG, PNG ou WebP até 10MB</span>
+                  </label>
+                )}
               </div>
 
               <div>
