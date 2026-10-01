@@ -4,6 +4,7 @@ import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLef
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { RichTextEditor } from '../components/RichTextEditor';
+import { toast } from 'sonner';
 
 interface PostFormData {
   id?: number;
@@ -184,11 +185,9 @@ export default function AdminDashboard() {
       .from('profiles')
       .upsert({ id: session.user.id, ...data, updated_at: new Date().toISOString() });
     if (error) {
-      setProfileStatus('error');
-      setProfileErrorMessage(error.message);
+      toast.error(error.message);
     } else {
-      setProfileStatus('success');
-      setTimeout(() => setProfileStatus('idle'), 4000);
+      toast.success('Perfil atualizado com sucesso!');
     }
   };
 
@@ -202,6 +201,7 @@ export default function AdminDashboard() {
           territorio: data.territorio, data: data.data
         }).eq('id', data.id);
         if (error) throw error;
+        toast.success('Publicação atualizada com sucesso!');
       } else {
         const { error } = await supabase.from('posts').insert([{
           title: data.title, summary: data.summary, content: data.content,
@@ -209,14 +209,12 @@ export default function AdminDashboard() {
           territorio: data.territorio, data: data.data
         }]);
         if (error) throw error;
+        toast.success('Publicação criada com sucesso!');
       }
-      setPostStatus('success');
       resetPost({ title: '', summary: '', content: '', tipo_conteudo: '', gt_origem: '', territorio: '', data: '' });
       setIsEditing(false);
-      setTimeout(() => setPostStatus('idle'), 5000);
     } catch (err: any) {
-      setPostStatus('error');
-      setPostErrorMessage(err.message || 'Erro ao salvar a publicação.');
+      toast.error(err.message || 'Erro ao salvar a publicação.');
     }
   };
 
@@ -236,6 +234,7 @@ export default function AdminDashboard() {
   const handleDeletePost = async (id: number) => {
     if (!window.confirm('Tem certeza que deseja excluir esta publicação?')) return;
     await supabase.from('posts').delete().eq('id', id);
+    toast.success('Publicação excluída com sucesso!');
     fetchManagePosts();
   };
 
@@ -612,35 +611,59 @@ export default function AdminDashboard() {
             ) : postsList.length === 0 ? (
               <p className="text-slate-500">Nenhuma publicação encontrada.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-sm text-slate-500">
-                      <th className="pb-3 font-medium">Título</th>
-                      <th className="pb-3 font-medium">GT</th>
-                      <th className="pb-3 font-medium">Data</th>
-                      <th className="pb-3 font-medium">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {postsList.map(post => (
-                      <tr key={post.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                        <td className="py-3 pr-4 text-sm font-medium text-slate-900 line-clamp-1">{post.title}</td>
-                        <td className="py-3 pr-4 text-sm text-slate-500">{post.gt_origem || '-'}</td>
-                        <td className="py-3 pr-4 text-sm text-slate-500">{post.data}</td>
-                        <td className="py-3 text-sm flex items-center gap-3">
-                          <button onClick={() => handleEditPost(post)} className="text-blue-600 hover:text-blue-800" title="Editar">
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeletePost(post.id)} className="text-red-600 hover:text-red-800" title="Excluir">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
+              <>
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-sm text-slate-500">
+                        <th className="pb-3 font-medium">Título</th>
+                        <th className="pb-3 font-medium">GT</th>
+                        <th className="pb-3 font-medium">Data</th>
+                        <th className="pb-3 font-medium">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {postsList.map(post => (
+                        <tr key={post.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                          <td className="py-3 pr-4 text-sm font-medium text-slate-900 line-clamp-1">{post.title}</td>
+                          <td className="py-3 pr-4 text-sm text-slate-500">{post.gt_origem || '-'}</td>
+                          <td className="py-3 pr-4 text-sm text-slate-500">{post.data}</td>
+                          <td className="py-3 text-sm flex items-center gap-3">
+                            <button onClick={() => handleEditPost(post)} className="text-blue-600 hover:text-blue-800" title="Editar">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeletePost(post.id)} className="text-red-600 hover:text-red-800" title="Excluir">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden space-y-4 mt-2">
+                  {postsList.map(post => (
+                    <div key={post.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-2 shadow-sm">
+                      <h4 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">{post.title}</h4>
+                      <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                        <span>GT: {post.gt_origem || '-'}</span>
+                        <span>{post.data}</span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-2 pt-3 border-t border-slate-200/60">
+                        <button onClick={() => handleEditPost(post)} className="text-blue-600 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-transform">
+                          <Edit3 className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button onClick={() => handleDeletePost(post.id)} className="text-red-600 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition-transform ml-auto">
+                          <Trash2 className="w-3.5 h-3.5" /> Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { ArrowLeft, Calendar, MapPin, Sparkles, BookOpen } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Sparkles, BookOpen, Share2, MessageCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { motion, useScroll, useSpring } from 'motion/react';
+import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 
 function renderContent(content: string): string {
@@ -26,6 +28,24 @@ export default function Post() {
   const { id } = useParams();
   const [post, setPost] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast.success('Link copiado para a área de transferência!');
+  };
+
+  const handleWhatsAppShare = () => {
+    const url = encodeURIComponent(window.location.href);
+    const text = encodeURIComponent(`Veja esta publicação no Observatório PET-Saúde GT 08:\n*${post?.title}*\n\n`);
+    window.open(`https://api.whatsapp.com/send?text=${text}${url}`, '_blank');
+  };
 
   useEffect(() => {
     async function fetchPost() {
@@ -88,6 +108,12 @@ export default function Post() {
   return (
     <div className="relative min-h-screen bg-slate-50/50 text-slate-800 selection:bg-primary/20 pb-20">
       
+      {/* Barra de Progresso de Leitura */}
+      <motion.div 
+        className="fixed top-0 left-0 right-0 h-1.5 bg-primary origin-left z-[100]"
+        style={{ scaleX }}
+      />
+
       {/* Background Grid Pattern */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none opacity-40 fixed" />
 
@@ -155,6 +181,29 @@ export default function Post() {
               </div>
             )}
           </div>
+
+          {/* Botões de Compartilhamento */}
+          <div className="mt-16 pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="text-center sm:text-left">
+              <h3 className="font-bold text-slate-800 mb-1">Gostou da publicação?</h3>
+              <p className="text-sm text-slate-500">Compartilhe e ajude a combater a desinformação em saúde.</p>
+            </div>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <button 
+                onClick={handleWhatsAppShare}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl transition-all shadow-sm hover:shadow-[#25D366]/30 hover:-translate-y-0.5 active:scale-95"
+              >
+                <MessageCircle className="w-5 h-5" /> WhatsApp
+              </button>
+              <button 
+                onClick={handleCopyLink}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all border border-slate-200 active:scale-95"
+              >
+                <Share2 className="w-5 h-5" /> Copiar
+              </button>
+            </div>
+          </div>
+
         </div>
       </main>
     </div>

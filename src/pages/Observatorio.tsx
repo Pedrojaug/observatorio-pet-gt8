@@ -6,12 +6,14 @@ import {
   Calendar, 
   MapPin, 
   BookOpen, 
+  BookX,
   ChevronRight, 
   Sparkles,
   ArrowUpRight
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { supabase } from '../lib/supabase';
+import { motion } from 'motion/react';
 
 interface Artigo {
   id: number;
@@ -180,36 +182,63 @@ export default function Observatorio() {
 
         {/* Dynamic Articles Feed */}
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 animate-pulse shadow-sm">
-                <div className="h-6 w-24 bg-slate-200 rounded-full" />
-                <div className="h-6 w-3/4 bg-slate-200 rounded-md" />
-                <div className="h-24 bg-slate-200 rounded-md" />
-                <div className="h-8 w-28 bg-slate-200 rounded-md mt-6" />
+              <div key={i} className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-sm">
+                <div className="animate-pulse flex flex-col h-full space-y-4">
+                  <div className="flex gap-2 mb-2">
+                    <div className="h-5 w-16 bg-slate-200 rounded-full" />
+                    <div className="h-5 w-24 bg-slate-200 rounded-full" />
+                  </div>
+                  <div className="h-6 w-11/12 bg-slate-200 rounded-md" />
+                  <div className="h-20 w-full bg-slate-100 rounded-md mt-4" />
+                  <div className="pt-4 border-t border-slate-100 flex justify-between mt-auto">
+                    <div className="h-4 w-20 bg-slate-200 rounded" />
+                    <div className="h-4 w-16 bg-slate-200 rounded" />
+                  </div>
+                </div>
               </div>
             ))}
-          </div>
+          </motion.div>
         ) : conteudosFiltrados.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm">
-            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
-              <BookOpen className="w-6 h-6" />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white border border-slate-200 rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4 shadow-sm"
+          >
+            <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center mx-auto text-rose-400">
+              <BookX className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800">Nenhuma publicação encontrada</h3>
-            <p className="text-slate-500 text-sm">
+            <h3 className="text-xl font-bold text-slate-800">Nenhuma publicação encontrada</h3>
+            <p className="text-slate-500 text-base">
               Não encontramos materiais no Observatório correspondentes aos filtros selecionados.
             </p>
-            <div className="pt-2">
+            <div className="pt-4">
               <button 
                 onClick={() => {setBusca(''); setFiltroGT(''); setFiltroTipo('');}} 
-                className="text-primary hover:text-secondary font-bold text-sm underline"
+                className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-all active:scale-95"
               >
                 Limpar todos os filtros
               </button>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <motion.div 
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+            className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
+          >
             {conteudosFiltrados.map((item) => {
               const category = item.tipo_conteudo || item.categoria || 'Artigo';
               let badgeColor = 'bg-primary/10 text-primary border-primary/20';
@@ -224,7 +253,11 @@ export default function Observatorio() {
               }
 
               return (
-                <article 
+                <motion.article 
+                  variants={{
+                    hidden: { opacity: 0, y: 20 },
+                    show: { opacity: 1, y: 0 }
+                  }}
                   key={item.id} 
                   className="group bg-white hover:bg-slate-50/20 border border-slate-200/80 hover:border-primary/20 rounded-3xl p-6 sm:p-7 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
                 >
@@ -269,10 +302,10 @@ export default function Observatorio() {
                       Acessar <ArrowUpRight className="w-4 h-4" />
                     </Link>
                   </div>
-                </article>
+                </motion.article>
               );
             })}
-          </div>
+          </motion.div>
         )}
       </main>
     </div>

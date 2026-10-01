@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { Toaster } from 'sonner';
 // @ts-ignore
 import logoWhite from "../../imports/Logo_Horizontal_PET_Sa_de.svg";
 
@@ -92,6 +93,9 @@ export function Layout() {
       <main className="flex-1">
         <Outlet />
       </main>
+
+      {/* Global Toaster for Notifications */}
+      <Toaster position="bottom-right" richColors theme="light" />
 
       {/* Footer */}
       <footer className="border-t border-border bg-card">

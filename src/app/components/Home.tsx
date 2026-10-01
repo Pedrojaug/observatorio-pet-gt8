@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
+import { motion } from "motion/react";
 import { 
   Search, 
   MapPin, 
@@ -133,7 +134,12 @@ export function Home() {
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             
             {/* Left Column: Title & Description */}
-            <div className="lg:col-span-7 space-y-8 text-center lg:text-left z-10">
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="lg:col-span-7 space-y-8 text-center lg:text-left z-10"
+            >
               
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-semibold text-xs tracking-wider uppercase animate-fade-in">
@@ -179,10 +185,15 @@ export function Home() {
                   </Link>
                 </Button>
               </div>
-            </div>
+            </motion.div>
 
             {/* Right Column: Glassmorphic Interactive Dashboard Mockup */}
-            <div className="lg:col-span-5 relative w-full max-w-lg mx-auto lg:max-w-none">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
+              className="lg:col-span-5 relative w-full max-w-lg mx-auto lg:max-w-none"
+            >
               
               {/* Decorative Glowing Orbs behind the Mockup */}
               <div className="absolute -top-16 -left-16 w-72 h-72 rounded-full bg-primary/20 blur-3xl pointer-events-none animate-pulse" style={{ animationDuration: '8s' }} />
@@ -251,7 +262,7 @@ export function Home() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
           </div>
         </div>
