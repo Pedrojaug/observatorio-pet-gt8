@@ -405,21 +405,21 @@ export default function AdminDashboard() {
   // --- Painel principal (logado) ---
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-6">
+    <div className="min-h-screen bg-slate-50 py-6 sm:py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-6">
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex justify-between items-center">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Painel do Observatório</h1>
-            <p className="text-slate-500 text-sm mt-0.5">{session.user.email}</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Painel do Observatório</h1>
+            <p className="text-slate-500 text-sm mt-0.5 break-all">{session.user.email}</p>
           </div>
           <button onClick={() => supabase.auth.signOut()}
-            className="text-slate-500 hover:text-red-600 flex items-center gap-2 text-sm font-medium transition-colors">
+            className="text-slate-500 hover:text-red-600 flex items-center gap-2 text-sm font-bold bg-slate-50 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors w-full sm:w-auto justify-center">
             <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => { setActiveTab('publish'); if (!isEditing) resetPost({ content: '' }); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === 'publish' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
             <FileText className="w-4 h-4" /> {isEditing ? 'Editar Material' : 'Publicar Material'}
