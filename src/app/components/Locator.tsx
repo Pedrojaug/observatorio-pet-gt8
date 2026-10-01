@@ -353,7 +353,7 @@ export function Locator() {
                             // Acha a unidade mais próxima em linha reta
                             let nearest: HealthUnit | null = null;
                             let minDistance = Infinity;
-                            healthUnits.forEach(unit => {
+                            for (const unit of healthUnits) {
                               if (unit.latitude && unit.longitude) {
                                 const d = Math.hypot(parseFloat(unit.latitude) - latitude, parseFloat(unit.longitude) - longitude);
                                 if (d < minDistance) {
@@ -361,7 +361,7 @@ export function Locator() {
                                   nearest = unit;
                                 }
                               }
-                            });
+                            }
                             if (nearest) {
                               setSelectedMunicipio(nearest.municipio);
                               setSelectedBairro(normalizeString(nearest.bairro));
