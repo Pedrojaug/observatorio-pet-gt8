@@ -35,63 +35,88 @@ const contentTypes = [
 ];
 
 export default function Observatorio() {
+  const PAGE_SIZE = 9;
   const [conteudos, setConteudos] = useState<Artigo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   
   // Estados para os filtros
   const [busca, setBusca] = useState('');
+  const [debouncedBusca, setDebouncedBusca] = useState('');
   const [filtroGT, setFiltroGT] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [page, setPage] = useState(0);
+
+  // Debounce para não fazer dezenas de requisições ao digitar
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedBusca(busca), 500);
+    return () => clearTimeout(handler);
+  }, [busca]);
+
+  // Se qualquer filtro mudar, volta pra página 0
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedBusca, filtroGT, filtroTipo]);
 
   useEffect(() => {
     async function fetchArtigos() {
+      if (page === 0) setLoading(true);
+      else setLoadingMore(true);
+
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('posts')
-          .select('*')
+          .select('*', { count: 'exact' })
           .order('data', { ascending: false });
+
+        if (debouncedBusca) {
+          query = query.or(`title.ilike.%${debouncedBusca}%,summary.ilike.%${debouncedBusca}%,territorio.ilike.%${debouncedBusca}%`);
+        }
+        if (filtroGT) {
+          query = query.eq('gt_origem', filtroGT);
+        }
+        if (filtroTipo) {
+          query = query.or(`tipo_conteudo.eq.${filtroTipo},categoria.eq.${filtroTipo}`);
+        }
+
+        query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        const { data, error, count } = await query;
 
         if (error) {
           console.error('Erro ao buscar artigos:', error);
         } else if (data) {
-          setConteudos(data);
+          if (page === 0) {
+            setConteudos(data);
+          } else {
+            setConteudos(prev => [...prev, ...data]);
+          }
+          if (count !== null) {
+            setHasMore(data.length === PAGE_SIZE && (page + 1) * PAGE_SIZE < count);
+          }
         }
       } catch (err) {
         console.error('Erro inesperado:', err);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     }
 
     fetchArtigos();
-  }, []);
+  }, [debouncedBusca, filtroGT, filtroTipo, page]);
 
-  // Lógica de filtragem local
-  const conteudosFiltrados = useMemo(() => {
-    return conteudos.filter((item) => {
-      const matchBusca = 
-        item.title.toLowerCase().includes(busca.toLowerCase()) || 
-        item.summary.toLowerCase().includes(busca.toLowerCase()) ||
-        (item.territorio && item.territorio.toLowerCase().includes(busca.toLowerCase()));
-      
-      const matchGT = filtroGT === '' || item.gt_origem === filtroGT;
-      
-      const tipo = item.tipo_conteudo || item.categoria;
-      const matchTipo = filtroTipo === '' || tipo === filtroTipo;
-
-      return matchBusca && matchGT && matchTipo;
-    });
-  }, [conteudos, busca, filtroGT, filtroTipo]);
-
-  // Formatter for date
+  // Lógica de formatação de data à prova de falhas
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'Sem data';
-    // Format YYYY-MM-DD to DD/MM/YYYY
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    try {
+      const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+      if (isNaN(d.getTime())) return dateStr;
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(d);
+    } catch {
+      return dateStr;
     }
-    return dateStr;
   };
 
   return (
@@ -204,7 +229,7 @@ export default function Observatorio() {
               </div>
             ))}
           </motion.div>
-        ) : conteudosFiltrados.length === 0 ? (
+        ) : conteudos.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -239,7 +264,7 @@ export default function Observatorio() {
             }}
             className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
           >
-            {conteudosFiltrados.map((item) => {
+            {conteudos.map((item) => {
               const category = item.tipo_conteudo || item.categoria || 'Artigo';
               let badgeColor = 'bg-primary/10 text-primary border-primary/20';
               if (category === 'Relato de Experiência') {
@@ -306,6 +331,19 @@ export default function Observatorio() {
               );
             })}
           </motion.div>
+        )}
+
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="flex justify-center pt-8">
+            <button 
+              onClick={() => setPage(p => p + 1)}
+              disabled={loadingMore}
+              className="px-8 py-3 rounded-full bg-white border border-slate-200 text-slate-700 font-bold shadow-sm hover:shadow-md hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingMore ? 'Carregando...' : 'Ver Mais Publicações'}
+            </button>
+          </div>
         )}
       </main>
     </div>

@@ -71,11 +71,13 @@ export default function Post() {
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'Sem data';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    try {
+      const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`);
+      if (isNaN(d.getTime())) return dateStr;
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(d);
+    } catch {
+      return dateStr;
     }
-    return dateStr;
   };
 
   if (loading) {

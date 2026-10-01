@@ -61,12 +61,17 @@ export function Locator() {
     return digits;
   };
 
+  // Normaliza strings para evitar duplicatas por acentos ou espaços
+  const normalizeString = (str: string) => {
+    return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() : "";
+  };
+
   // Get unique sorted neighborhoods based on selected municipality
   const availableBairros = useMemo(() => {
     const bairrosSet = new Set<string>();
     healthUnits.forEach((unit) => {
       if (unit.municipio === selectedMunicipio && unit.bairro && unit.tipo === 'USF') {
-        bairrosSet.add(unit.bairro.trim().toUpperCase());
+        bairrosSet.add(normalizeString(unit.bairro));
       }
     });
     return Array.from(bairrosSet).sort();
@@ -114,15 +119,15 @@ export function Locator() {
       return (healthUnits as HealthUnit[]).filter(unit => 
         unit.tipo === 'USF' &&
         unit.municipio === selectedMunicipio &&
-        unit.bairro.trim().toUpperCase() === selectedBairro.toUpperCase() &&
-        (resultSearchTerm === "" || unit.nome.toLowerCase().includes(resultSearchTerm.toLowerCase()))
+        normalizeString(unit.bairro) === normalizeString(selectedBairro) &&
+        (resultSearchTerm === "" || normalizeString(unit.nome).includes(normalizeString(resultSearchTerm)))
       );
     } else if (severity === 'moderate') {
       // Show UPAs / Emergency Units
       return (healthUnits as HealthUnit[]).filter(unit => 
         unit.tipo === 'UPA' &&
         (upaFilterMunicipio === "Todos" || unit.municipio === upaFilterMunicipio) &&
-        (resultSearchTerm === "" || unit.nome.toLowerCase().includes(resultSearchTerm.toLowerCase()))
+        (resultSearchTerm === "" || normalizeString(unit.nome).includes(normalizeString(resultSearchTerm)))
       );
     }
     return [];
