@@ -17,6 +17,20 @@ import {
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import healthUnits from "./unidades_selecionadas.json";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Corrige problema padrão dos ícones do Leaflet no React
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 interface HealthUnit {
   cnes: string;
@@ -132,6 +146,38 @@ export function Locator() {
     }
     return [];
   }, [severity, selectedMunicipio, selectedBairro, resultSearchTerm, upaFilterMunicipio]);
+
+  const renderMap = (units: HealthUnit[]) => {
+    if (!units || units.length === 0) return null;
+    
+    // Tenta pegar a primeira unidade com coordenadas para centralizar
+    const firstWithCoords = units.find(u => u.latitude && u.longitude);
+    const center: [number, number] = firstWithCoords 
+      ? [parseFloat(firstWithCoords.latitude), parseFloat(firstWithCoords.longitude)]
+      : [-7.115, -34.863]; // Default João Pessoa
+
+    return (
+      <div className="h-[400px] lg:h-[calc(100vh-200px)] lg:sticky top-28 w-full rounded-3xl overflow-hidden border border-slate-200 shadow-sm z-0">
+        <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap contributors'
+          />
+          {units.map(unit => {
+            if (!unit.latitude || !unit.longitude) return null;
+            return (
+              <Marker key={unit.cnes} position={[parseFloat(unit.latitude), parseFloat(unit.longitude)]}>
+                <Popup>
+                  <strong className="text-slate-800 text-sm">{unit.nome}</strong><br/>
+                  <span className="text-xs text-slate-500 block mt-1">{unit.logradouro}, {unit.numero}</span>
+                </Popup>
+              </Marker>
+            )
+          })}
+        </MapContainer>
+      </div>
+    );
+  };
 
   return (
     <div className="relative min-h-[calc(100vh-8rem)] bg-slate-50/50 text-slate-800 selection:bg-primary/20 pb-16">
@@ -574,58 +620,66 @@ export function Locator() {
                   <p className="text-slate-500 text-xs sm:text-sm">Encontramos {displayUnits.length} estabelecimentos correspondentes na sua região.</p>
                 </div>
 
-                {/* Grid of UPAs */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  {displayUnits.map((unit) => {
-                    const formattedPhone = getSanitizedPhone(unit.telefone);
-                    return (
-                      <div 
-                        key={unit.cnes} 
-                        className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
-                      >
-                        <div>
-                          <div className="flex items-start justify-between gap-2 mb-3">
-                            <h4 className="text-base font-bold text-slate-800">{unit.nome}</h4>
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">UPA</Badge>
-                          </div>
-                          <div className="space-y-3 text-xs text-slate-600 mt-4">
-                            <p className="flex items-start gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-400 flex-shrink-0" />
-                              <span>{unit.logradouro}, {unit.numero} - {unit.bairro}, {unit.municipio}</span>
-                            </p>
-                            <p className="flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                              <span className="font-semibold text-emerald-600">Aberto 24h • Segunda a Domingo</span>
-                            </p>
-                            {formattedPhone ? (
+                {/* Grid of UPAs and Map */}
+                <div className="flex flex-col-reverse lg:flex-row gap-6">
+                  {/* Left Column: Cards */}
+                  <div className="lg:w-1/2 space-y-4">
+                    {displayUnits.map((unit) => {
+                      const formattedPhone = getSanitizedPhone(unit.telefone);
+                      return (
+                        <div 
+                          key={unit.cnes} 
+                          className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-3">
+                              <h4 className="text-base font-bold text-slate-800">{unit.nome}</h4>
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">UPA</Badge>
+                            </div>
+                            <div className="space-y-3 text-xs text-slate-600 mt-4">
+                              <p className="flex items-start gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-400 flex-shrink-0" />
+                                <span>{unit.logradouro}, {unit.numero} - {unit.bairro}, {unit.municipio}</span>
+                              </p>
                               <p className="flex items-center gap-1.5">
-                                <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                <a href={`tel:${formattedPhone}`} className="text-primary hover:underline font-semibold">{unit.telefone}</a>
+                                <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                <span className="font-semibold text-emerald-600">Aberto 24h • Segunda a Domingo</span>
                               </p>
-                            ) : (
-                              <p className="flex items-center gap-1.5 text-slate-400 italic">
-                                <Phone className="w-3.5 h-3.5 text-slate-400/60 flex-shrink-0" />
-                                <span>Sem telefone cadastrado</span>
-                              </p>
-                            )}
+                              {formattedPhone ? (
+                                <p className="flex items-center gap-1.5">
+                                  <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                  <a href={`tel:${formattedPhone}`} className="text-primary hover:underline font-semibold">{unit.telefone}</a>
+                                </p>
+                              ) : (
+                                <p className="flex items-center gap-1.5 text-slate-400 italic">
+                                  <Phone className="w-3.5 h-3.5 text-slate-400/60 flex-shrink-0" />
+                                  <span>Sem telefone cadastrado</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-6 pt-4 border-t border-slate-100">
+                            <Button 
+                              variant="outline" 
+                              className="h-10 w-full"
+                              onClick={() => {
+                                const query = encodeURIComponent(`${unit.nome}, ${unit.logradouro}, ${unit.bairro}, ${unit.municipio}`);
+                                window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                              }}
+                            >
+                              <Navigation className="w-4 h-4 mr-2" /> Como chegar (Google Maps)
+                            </Button>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        <div className="mt-6 pt-4 border-t border-slate-100">
-                          <Button 
-                            variant="outline" 
-                            className="h-10 w-full"
-                            onClick={() => {
-                              const query = encodeURIComponent(`${unit.nome}, ${unit.logradouro}, ${unit.bairro}, ${unit.municipio}`);
-                              window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-                            }}
-                          >
-                            <Navigation className="w-4 h-4 mr-2" /> Como chegar (Google Maps)
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Right Column: Map */}
+                  <div className="lg:w-1/2 relative">
+                    {renderMap(displayUnits)}
+                  </div>
                 </div>
 
                 <div className="pt-4 text-center">
@@ -682,59 +736,67 @@ export function Locator() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {displayUnits.map((unit) => {
-                      const formattedPhone = getSanitizedPhone(unit.telefone);
-                      return (
-                        <div 
-                          key={unit.cnes} 
-                          className="bg-white border border-slate-200/85 hover:border-primary/20 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
-                        >
-                          <div>
-                            <div className="flex items-start justify-between gap-2 mb-3">
-                              <h4 className="text-base font-bold text-slate-800">{unit.nome}</h4>
-                              <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">USF</Badge>
-                            </div>
-                            
-                            <div className="space-y-3 text-xs text-slate-600 mt-4">
-                              <p className="flex items-start gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-400 flex-shrink-0" />
-                                <span>{unit.logradouro}, {unit.numero} - {unit.bairro}, {unit.municipio}</span>
-                              </p>
-                              <p className="flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                <span>Segunda a Sexta: 07h às 17h (Rotina)</span>
-                              </p>
-                              {formattedPhone ? (
+                  <div className="flex flex-col-reverse lg:flex-row gap-6">
+                    {/* Left Column: Cards */}
+                    <div className="lg:w-1/2 space-y-4">
+                      {displayUnits.map((unit) => {
+                        const formattedPhone = getSanitizedPhone(unit.telefone);
+                        return (
+                          <div 
+                            key={unit.cnes} 
+                            className="bg-white border border-slate-200/85 hover:border-primary/20 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <h4 className="text-base font-bold text-slate-800">{unit.nome}</h4>
+                                <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">USF</Badge>
+                              </div>
+                              
+                              <div className="space-y-3 text-xs text-slate-600 mt-4">
+                                <p className="flex items-start gap-1.5">
+                                  <MapPin className="w-3.5 h-3.5 mt-0.5 text-slate-400 flex-shrink-0" />
+                                  <span>{unit.logradouro}, {unit.numero} - {unit.bairro}, {unit.municipio}</span>
+                                </p>
                                 <p className="flex items-center gap-1.5">
-                                  <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                  <a href={`tel:${formattedPhone}`} className="text-primary hover:underline font-semibold">{unit.telefone}</a>
+                                  <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                  <span>Segunda a Sexta: 07h às 17h (Rotina)</span>
                                 </p>
-                              ) : (
-                                <p className="flex items-center gap-1.5 text-slate-400 italic">
-                                  <Phone className="w-3.5 h-3.5 text-slate-400/60 flex-shrink-0" />
-                                  <span>Sem telefone cadastrado</span>
-                                </p>
-                              )}
-                              <p className="text-[10px] text-slate-400 font-mono">CNES: {unit.cnes}</p>
+                                {formattedPhone ? (
+                                  <p className="flex items-center gap-1.5">
+                                    <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                    <a href={`tel:${formattedPhone}`} className="text-primary hover:underline font-semibold">{unit.telefone}</a>
+                                  </p>
+                                ) : (
+                                  <p className="flex items-center gap-1.5 text-slate-400 italic">
+                                    <Phone className="w-3.5 h-3.5 text-slate-400/60 flex-shrink-0" />
+                                    <span>Sem telefone cadastrado</span>
+                                  </p>
+                                )}
+                                <p className="text-[10px] text-slate-400 font-mono">CNES: {unit.cnes}</p>
+                              </div>
+                            </div>
+
+                            <div className="mt-6 pt-4 border-t border-slate-100">
+                              <Button 
+                                variant="outline" 
+                                className="h-10 w-full"
+                                onClick={() => {
+                                  const query = encodeURIComponent(`${unit.nome}, ${unit.logradouro}, ${unit.bairro}, ${unit.municipio}`);
+                                  window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                                }}
+                              >
+                                <Navigation className="w-4 h-4 mr-2" /> Como chegar (Google Maps)
+                              </Button>
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          <div className="mt-6 pt-4 border-t border-slate-100">
-                            <Button 
-                              variant="outline" 
-                              className="h-10 w-full"
-                              onClick={() => {
-                                const query = encodeURIComponent(`${unit.nome}, ${unit.logradouro}, ${unit.bairro}, ${unit.municipio}`);
-                                window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-                              }}
-                            >
-                              <Navigation className="w-4 h-4 mr-2" /> Como chegar (Google Maps)
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {/* Right Column: Map */}
+                    <div className="lg:w-1/2 relative">
+                      {renderMap(displayUnits)}
+                    </div>
                   </div>
                 )}
 
