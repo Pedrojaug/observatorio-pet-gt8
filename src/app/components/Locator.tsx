@@ -16,21 +16,31 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import healthUnits from "./unidades_selecionadas.json";
+import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// Corrige problema padrão dos ícones do Leaflet no React
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
+// Ícones Customizados
+const greenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
-L.Marker.prototype.options.icon = DefaultIcon;
+
+const redIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 interface HealthUnit {
   cnes: string;
@@ -48,6 +58,8 @@ interface HealthUnit {
 }
 
 export function Locator() {
+  const [healthUnits, setHealthUnits] = useState<HealthUnit[]>([]);
+
   // Navigation steps: 'triage' | 'location' | 'results'
   const [step, setStep] = useState<'triage' | 'location' | 'results'>('triage');
   const [severity, setSeverity] = useState<'light' | 'moderate' | 'grave' | null>(null);
@@ -57,11 +69,19 @@ export function Locator() {
   const [selectedBairro, setSelectedBairro] = useState<string>('');
   const [selectedBairroSearch, setSelectedBairroSearch] = useState<string>('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
 
   // Local state for manual filter search on results screen
   const [resultSearchTerm, setResultSearchTerm] = useState("");
   // Local state to filter UPAs by municipality on UPA screen
   const [upaFilterMunicipio, setUpaFilterMunicipio] = useState<string>("Todos");
+
+  // Busca do Banco (Supabase) em vez do JSON
+  useMemo(() => {
+    supabase.from('health_units').select('*').then(({ data }) => {
+      if (data) setHealthUnits(data);
+    });
+  }, []);
 
   // Phone sanitizer helper
   const getSanitizedPhone = (phone: string) => {
@@ -165,8 +185,9 @@ export function Locator() {
           />
           {units.map(unit => {
             if (!unit.latitude || !unit.longitude) return null;
+            const markerIcon = unit.tipo === 'UPA' ? redIcon : greenIcon;
             return (
-              <Marker key={unit.cnes} position={[parseFloat(unit.latitude), parseFloat(unit.longitude)]}>
+              <Marker key={unit.cnes} position={[parseFloat(unit.latitude), parseFloat(unit.longitude)]} icon={markerIcon}>
                 <Popup>
                   <strong className="text-slate-800 text-sm">{unit.nome}</strong><br/>
                   <span className="text-xs text-slate-500 block mt-1">{unit.logradouro}, {unit.numero}</span>
@@ -317,6 +338,89 @@ export function Locator() {
               <p className="text-slate-500 text-xs sm:text-sm">
                 No SUS, o atendimento de rotina (USF) é referenciado pelo bairro de residência do usuário para assegurar o acompanhamento contínuo da equipe.
               </p>
+            </div>
+
+            {/* GPS & CEP Auto-Locate */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
+              <button 
+                onClick={() => {
+                  if ("geolocation" in navigator) {
+                    toast.promise(
+                      new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(async (pos) => {
+                          try {
+                            const { latitude, longitude } = pos.coords;
+                            // Acha a unidade mais próxima em linha reta
+                            let nearest = null;
+                            let minDistance = Infinity;
+                            healthUnits.forEach(unit => {
+                              if (unit.latitude && unit.longitude) {
+                                const d = Math.hypot(parseFloat(unit.latitude) - latitude, parseFloat(unit.longitude) - longitude);
+                                if (d < minDistance) {
+                                  minDistance = d;
+                                  nearest = unit;
+                                }
+                              }
+                            });
+                            if (nearest) {
+                              setSelectedMunicipio(nearest.municipio);
+                              setSelectedBairro(normalizeString(nearest.bairro));
+                              setSelectedBairroSearch(nearest.bairro);
+                              resolve(`Bairro ${nearest.bairro} localizado pelo seu GPS!`);
+                            } else {
+                              reject("Não localizamos unidades próximas.");
+                            }
+                          } catch (e) {
+                            reject("Erro ao processar localização.");
+                          }
+                        }, () => reject("Permissão negada ou GPS desligado."));
+                      }),
+                      {
+                        loading: 'Buscando sua localização...',
+                        success: (msg: any) => msg,
+                        error: (err: any) => err,
+                      }
+                    );
+                  }
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <MapPin className="w-4 h-4" /> Usar meu GPS
+              </button>
+
+              <div className="hidden sm:block text-slate-300">ou</div>
+
+              <div className="relative w-full">
+                <input 
+                  type="text"
+                  placeholder="Ou digite seu CEP"
+                  className="w-full h-10 px-4 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-primary/20"
+                  maxLength={9}
+                  onChange={async (e) => {
+                    let val = e.target.value.replace(/\D/g, '');
+                    if (val.length === 8) {
+                      setCepLoading(true);
+                      try {
+                        const res = await fetch(`https://viacep.com.br/ws/${val}/json/`);
+                        const data = await res.json();
+                        if (data.bairro) {
+                          setSelectedBairroSearch(data.bairro);
+                          const match = availableBairros.find(b => normalizeString(b) === normalizeString(data.bairro));
+                          if (match) setSelectedBairro(match);
+                          toast.success(`Bairro ${data.bairro} encontrado via CEP!`);
+                        } else {
+                          toast.error("CEP não retornou um bairro válido.");
+                        }
+                      } catch {
+                        toast.error("Erro ao buscar CEP.");
+                      } finally {
+                        setCepLoading(false);
+                      }
+                    }
+                  }}
+                />
+                {cepLoading && <Activity className="w-4 h-4 text-primary absolute right-3 top-3 animate-spin" />}
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -659,7 +763,7 @@ export function Locator() {
                             </div>
                           </div>
 
-                          <div className="mt-6 pt-4 border-t border-slate-100">
+                          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2">
                             <Button 
                               variant="outline" 
                               className="h-10 w-full"
@@ -668,8 +772,22 @@ export function Locator() {
                                 window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
                               }}
                             >
-                              <Navigation className="w-4 h-4 mr-2" /> Como chegar (Google Maps)
+                              <Navigation className="w-4 h-4 mr-2" /> Como chegar (Maps)
                             </Button>
+                            
+                            {/* Chamar Uber */}
+                            {unit.latitude && unit.longitude && (
+                              <Button 
+                                variant="outline"
+                                className="h-10 w-full bg-slate-900 text-white hover:bg-slate-800 border-transparent hover:text-white"
+                                onClick={() => {
+                                  const uri = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${unit.latitude}&dropoff[longitude]=${unit.longitude}&dropoff[nickname]=${encodeURIComponent(unit.nome)}`;
+                                  window.open(uri, '_blank');
+                                }}
+                              >
+                                <span className="font-bold mr-1">Uber</span> Solicitar Corrida
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -776,7 +894,7 @@ export function Locator() {
                               </div>
                             </div>
 
-                            <div className="mt-6 pt-4 border-t border-slate-100">
+                            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2">
                               <Button 
                                 variant="outline" 
                                 className="h-10 w-full"
@@ -785,8 +903,22 @@ export function Locator() {
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
                                 }}
                               >
-                                <Navigation className="w-4 h-4 mr-2" /> Como chegar (Google Maps)
+                                <Navigation className="w-4 h-4 mr-2" /> Como chegar (Maps)
                               </Button>
+                              
+                              {/* Chamar Uber */}
+                              {unit.latitude && unit.longitude && (
+                                <Button 
+                                  variant="outline"
+                                  className="h-10 w-full bg-slate-900 text-white hover:bg-slate-800 border-transparent hover:text-white"
+                                  onClick={() => {
+                                    const uri = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${unit.latitude}&dropoff[longitude]=${unit.longitude}&dropoff[nickname]=${encodeURIComponent(unit.nome)}`;
+                                    window.open(uri, '_blank');
+                                  }}
+                                >
+                                  <span className="font-bold mr-1">Uber</span> Solicitar Corrida
+                                </Button>
+                              )}
                             </div>
                           </div>
                         );
