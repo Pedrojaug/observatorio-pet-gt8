@@ -366,6 +366,7 @@ export function Locator() {
                               setSelectedMunicipio(nearest.municipio);
                               setSelectedBairro(normalizeString(nearest.bairro));
                               setSelectedBairroSearch(nearest.bairro);
+                              setStep('results');
                               resolve(`Bairro ${nearest.bairro} localizado pelo seu GPS!`);
                             } else {
                               reject("Não localizamos unidades próximas.");
@@ -406,7 +407,10 @@ export function Locator() {
                         if (data.bairro) {
                           setSelectedBairroSearch(data.bairro);
                           const match = availableBairros.find(b => normalizeString(b) === normalizeString(data.bairro));
-                          if (match) setSelectedBairro(match);
+                          if (match) {
+                            setSelectedBairro(match);
+                            setStep('results');
+                          }
                           toast.success(`Bairro ${data.bairro} encontrado via CEP!`);
                         } else {
                           toast.error("CEP não retornou um bairro válido.");
