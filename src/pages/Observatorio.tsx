@@ -24,6 +24,7 @@ interface Artigo {
   tipo_conteudo?: string; // Novo padrão
   gt_origem?: string; // Qual GT produziu
   territorio?: string; // Local da ação
+  image_url?: string; // Foto de capa
 }
 
 const contentTypes = [
