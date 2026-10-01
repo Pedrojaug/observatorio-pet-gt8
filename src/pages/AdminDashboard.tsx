@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLeft } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
+import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLeft, Trash2, Edit3, List as ListIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { RichTextEditor } from '../components/RichTextEditor';
 
 interface PostFormData {
+  id?: number;
   title: string;
   summary: string;
   content: string;
@@ -29,6 +31,7 @@ export default function AdminDashboard() {
     register: registerPost,
     handleSubmit: handleSubmitPost,
     reset: resetPost,
+    control: controlPost,
     formState: { errors: postErrors, isSubmitting: isPostSubmitting },
   } = useForm<PostFormData>();
 
@@ -43,12 +46,17 @@ export default function AdminDashboard() {
   const [postErrorMessage, setPostErrorMessage] = useState('');
   const [profileStatus, setProfileStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [profileErrorMessage, setProfileErrorMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'publish' | 'profile'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'profile' | 'manage'>('publish');
+
+  const [postsList, setPostsList] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const [session, setSession] = useState<Session | null>(null);
   const [authView, setAuthView] = useState<AuthView>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [authInviteCode, setAuthInviteCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
@@ -110,6 +118,15 @@ export default function AdminDashboard() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true); clearAuthMessages();
+    
+    // Verificação de segurança (Cybersegurança)
+    const expectedCode = import.meta.env.VITE_INVITE_CODE;
+    if (expectedCode && authInviteCode !== expectedCode) {
+      setAuthError('Código de convite inválido ou não fornecido.');
+      setAuthLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signUp({
       email: authEmail,
       password: authPassword,
@@ -178,15 +195,54 @@ export default function AdminDashboard() {
   const onSubmitPost = async (data: PostFormData) => {
     setPostStatus('idle');
     try {
-      const { error } = await supabase.from('posts').insert([data]);
-      if (error) throw error;
+      if (data.id) {
+        const { error } = await supabase.from('posts').update({
+          title: data.title, summary: data.summary, content: data.content,
+          tipo_conteudo: data.tipo_conteudo, gt_origem: data.gt_origem,
+          territorio: data.territorio, data: data.data
+        }).eq('id', data.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('posts').insert([{
+          title: data.title, summary: data.summary, content: data.content,
+          tipo_conteudo: data.tipo_conteudo, gt_origem: data.gt_origem,
+          territorio: data.territorio, data: data.data
+        }]);
+        if (error) throw error;
+      }
       setPostStatus('success');
-      resetPost();
+      resetPost({ title: '', summary: '', content: '', tipo_conteudo: '', gt_origem: '', territorio: '', data: '' });
+      setIsEditing(false);
       setTimeout(() => setPostStatus('idle'), 5000);
     } catch (err: any) {
       setPostStatus('error');
       setPostErrorMessage(err.message || 'Erro ao salvar a publicação.');
     }
+  };
+
+  const fetchManagePosts = async () => {
+    setLoadingPosts(true);
+    const { data, error } = await supabase.from('posts').select('*').order('data', { ascending: false });
+    if (data) setPostsList(data);
+    setLoadingPosts(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'manage') {
+      fetchManagePosts();
+    }
+  }, [activeTab]);
+
+  const handleDeletePost = async (id: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta publicação?')) return;
+    await supabase.from('posts').delete().eq('id', id);
+    fetchManagePosts();
+  };
+
+  const handleEditPost = (post: any) => {
+    resetPost(post);
+    setIsEditing(true);
+    setActiveTab('publish');
   };
 
   // --- Telas de autenticação ---
@@ -277,6 +333,12 @@ export default function AdminDashboard() {
                 <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required
                   className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Código de Convite</label>
+                <input type="text" value={authInviteCode} onChange={(e) => setAuthInviteCode(e.target.value)} required
+                  placeholder="Solicite ao administrador"
+                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none" />
+              </div>
               <button type="submit" disabled={authLoading}
                 className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-70">
                 {authLoading ? 'Aguarde...' : 'Criar Conta'}
@@ -359,9 +421,13 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex gap-2">
-          <button onClick={() => setActiveTab('publish')}
+          <button onClick={() => { setActiveTab('publish'); if (!isEditing) resetPost({ content: '' }); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === 'publish' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <FileText className="w-4 h-4" /> Publicar Material
+            <FileText className="w-4 h-4" /> {isEditing ? 'Editar Material' : 'Publicar Material'}
+          </button>
+          <button onClick={() => setActiveTab('manage')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === 'manage' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+            <ListIcon className="w-4 h-4" /> Gerenciar Posts
           </button>
           <button onClick={() => setActiveTab('profile')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === 'profile' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
@@ -511,18 +577,71 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Conteúdo Completo</label>
-                <textarea {...registerPost('content')}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none h-48"
-                  placeholder="Escreva ou cole o texto completo aqui." />
+                <Controller
+                  name="content"
+                  control={controlPost}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <RichTextEditor content={field.value || ''} onChange={field.onChange} />
+                  )}
+                />
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+                {isEditing && (
+                  <button type="button" onClick={() => { resetPost({ title: '', summary: '', content: '', tipo_conteudo: '', gt_origem: '', territorio: '', data: '' }); setIsEditing(false); }}
+                    className="text-slate-500 hover:text-slate-700 text-sm font-medium">
+                    Cancelar Edição
+                  </button>
+                )}
                 <button type="submit" disabled={isPostSubmitting}
-                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-                  {isPostSubmitting ? 'Salvando...' : <><Save className="w-5 h-5" /> Publicar Material</>}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed ml-auto">
+                  {isPostSubmitting ? 'Salvando...' : <><Save className="w-5 h-5" /> {isEditing ? 'Salvar Alterações' : 'Publicar Material'}</>}
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* Aba: Gerenciar Posts */}
+        {activeTab === 'manage' && (
+          <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900 mb-6">Gerenciar Publicações</h2>
+            {loadingPosts ? (
+              <p className="text-slate-500">Carregando publicações...</p>
+            ) : postsList.length === 0 ? (
+              <p className="text-slate-500">Nenhuma publicação encontrada.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-sm text-slate-500">
+                      <th className="pb-3 font-medium">Título</th>
+                      <th className="pb-3 font-medium">GT</th>
+                      <th className="pb-3 font-medium">Data</th>
+                      <th className="pb-3 font-medium">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {postsList.map(post => (
+                      <tr key={post.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                        <td className="py-3 pr-4 text-sm font-medium text-slate-900 line-clamp-1">{post.title}</td>
+                        <td className="py-3 pr-4 text-sm text-slate-500">{post.gt_origem || '-'}</td>
+                        <td className="py-3 pr-4 text-sm text-slate-500">{post.data}</td>
+                        <td className="py-3 text-sm flex items-center gap-3">
+                          <button onClick={() => handleEditPost(post)} className="text-blue-600 hover:text-blue-800" title="Editar">
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeletePost(post.id)} className="text-red-600 hover:text-red-800" title="Excluir">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
