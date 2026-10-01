@@ -12,7 +12,8 @@ import {
   Activity, 
   PhoneCall, 
   HelpCircle,
-  Stethoscope
+  Stethoscope,
+  Copy
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -103,6 +104,21 @@ export function Locator() {
   // Normaliza strings para evitar duplicatas por acentos ou espaços
   const normalizeString = (str: string) => {
     return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() : "";
+  };
+
+  // Copia endereço completo formatado para a área de transferência
+  const handleCopyAddress = (unit: HealthUnit) => {
+    const parts = [
+      unit.nome,
+      `${unit.logradouro}${unit.numero && unit.numero !== 'S/N' ? `, nº ${unit.numero}` : ', S/N'}`,
+      unit.bairro,
+      unit.municipio,
+      unit.cep ? `CEP: ${unit.cep}` : null
+    ].filter(Boolean);
+
+    const fullAddress = parts.join(' - ');
+    navigator.clipboard.writeText(fullAddress);
+    toast.success("Endereço copiado para a área de transferência!");
   };
 
   // Get unique sorted neighborhoods based on selected municipality
@@ -863,31 +879,26 @@ export function Locator() {
                             </div>
                           </div>
 
-                          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2">
+                          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
                             <Button 
                               variant="outline" 
-                              className="h-10 w-full"
+                              className="h-10 flex-1 text-xs sm:text-sm font-semibold hover:bg-slate-50 border-slate-200"
                               onClick={() => {
                                 const query = encodeURIComponent(`${unit.nome}, ${unit.logradouro}, ${unit.bairro}, ${unit.municipio}`);
                                 window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
                               }}
                             >
-                              <Navigation className="w-4 h-4 mr-2" /> Como chegar (Maps)
+                              <Navigation className="w-4 h-4 mr-1.5 text-primary" /> Como chegar
                             </Button>
                             
-                            {/* Chamar Uber */}
-                            {unit.latitude && unit.longitude && (
-                              <Button 
-                                variant="outline"
-                                className="h-10 w-full bg-slate-900 text-white hover:bg-slate-800 border-transparent hover:text-white"
-                                onClick={() => {
-                                  const uri = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${unit.latitude}&dropoff[longitude]=${unit.longitude}&dropoff[nickname]=${encodeURIComponent(unit.nome)}`;
-                                  window.open(uri, '_blank');
-                                }}
-                              >
-                                <span className="font-bold mr-1">Uber</span> Solicitar Corrida
-                              </Button>
-                            )}
+                            <Button 
+                              variant="outline"
+                              className="h-10 flex-1 text-xs sm:text-sm font-semibold hover:bg-slate-50 border-slate-200 text-slate-700"
+                              onClick={() => handleCopyAddress(unit)}
+                              title="Copiar endereço completo"
+                            >
+                              <Copy className="w-4 h-4 mr-1.5 text-slate-500" /> Copiar endereço
+                            </Button>
                           </div>
                         </div>
                       );
@@ -994,31 +1005,26 @@ export function Locator() {
                               </div>
                             </div>
 
-                            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2">
+                            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
                               <Button 
                                 variant="outline" 
-                                className="h-10 w-full"
+                                className="h-10 flex-1 text-xs sm:text-sm font-semibold hover:bg-slate-50 border-slate-200"
                                 onClick={() => {
                                   const query = encodeURIComponent(`${unit.nome}, ${unit.logradouro}, ${unit.bairro}, ${unit.municipio}`);
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
                                 }}
                               >
-                                <Navigation className="w-4 h-4 mr-2" /> Como chegar (Maps)
+                                <Navigation className="w-4 h-4 mr-1.5 text-primary" /> Como chegar
                               </Button>
                               
-                              {/* Chamar Uber */}
-                              {unit.latitude && unit.longitude && (
-                                <Button 
-                                  variant="outline"
-                                  className="h-10 w-full bg-slate-900 text-white hover:bg-slate-800 border-transparent hover:text-white"
-                                  onClick={() => {
-                                    const uri = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${unit.latitude}&dropoff[longitude]=${unit.longitude}&dropoff[nickname]=${encodeURIComponent(unit.nome)}`;
-                                    window.open(uri, '_blank');
-                                  }}
-                                >
-                                  <span className="font-bold mr-1">Uber</span> Solicitar Corrida
-                                </Button>
-                              )}
+                              <Button 
+                                variant="outline"
+                                className="h-10 flex-1 text-xs sm:text-sm font-semibold hover:bg-slate-50 border-slate-200 text-slate-700"
+                                onClick={() => handleCopyAddress(unit)}
+                                title="Copiar endereço completo"
+                              >
+                                <Copy className="w-4 h-4 mr-1.5 text-slate-500" /> Copiar endereço
+                              </Button>
                             </div>
                           </div>
                         );
