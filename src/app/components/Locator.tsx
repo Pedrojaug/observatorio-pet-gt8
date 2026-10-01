@@ -351,7 +351,7 @@ export function Locator() {
                           try {
                             const { latitude, longitude } = pos.coords;
                             // Acha a unidade mais próxima em linha reta
-                            let nearest = null;
+                            let nearest: HealthUnit | null = null;
                             let minDistance = Infinity;
                             healthUnits.forEach(unit => {
                               if (unit.latitude && unit.longitude) {
