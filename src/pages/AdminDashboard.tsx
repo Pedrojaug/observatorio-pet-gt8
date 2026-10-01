@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLeft, Trash2, Edit3, List as ListIcon } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, Lock, LogOut, User, FileText, ArrowLeft, Trash2, Edit3, List as ListIcon, Key, Copy, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -47,7 +47,10 @@ export default function AdminDashboard() {
   const [postErrorMessage, setPostErrorMessage] = useState('');
   const [profileStatus, setProfileStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [profileErrorMessage, setProfileErrorMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'publish' | 'profile' | 'manage'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'profile' | 'manage' | 'invites'>('publish');
+  const [inviteCodesList, setInviteCodesList] = useState<any[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   const [postsList, setPostsList] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
@@ -119,23 +122,38 @@ export default function AdminDashboard() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true); clearAuthMessages();
-    
-    // Verificação de segurança (Cybersegurança)
-    const expectedCode = import.meta.env.VITE_INVITE_CODE;
-    if (expectedCode && authInviteCode !== expectedCode) {
-      setAuthError('Código de convite inválido ou não fornecido.');
+
+    if (!authInviteCode.trim()) {
+      setAuthError('Por favor, informe um código de convite da equipe.');
       setAuthLoading(false);
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
+    // Validação segura via RPC no Supabase (não expõe códigos nem segredos no bundle do navegador)
+    const { data: isValid, error: rpcError } = await supabase.rpc('check_invite_code', {
+      code_input: authInviteCode.trim()
+    });
+
+    if (rpcError || !isValid) {
+      setAuthError('Código de convite inválido, inativo ou já utilizado.');
+      setAuthLoading(false);
+      return;
+    }
+
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: authEmail,
       password: authPassword,
       options: { emailRedirectTo: `${window.location.origin}/cadastro-oculto-gt` },
     });
+
     if (error) {
       setAuthError(error.message);
     } else {
+      // Marca o código como consumido no banco
+      await supabase.rpc('use_invite_code', {
+        code_input: authInviteCode.trim(),
+        user_email: authEmail.trim()
+      });
       setAuthSuccess('Cadastro realizado! Verifique sua caixa de e-mail para confirmar a conta.');
     }
     setAuthLoading(false);
@@ -225,11 +243,59 @@ export default function AdminDashboard() {
     setLoadingPosts(false);
   };
 
+  const fetchInviteCodes = async () => {
+    setLoadingInvites(true);
+    const { data, error } = await supabase
+      .from('invite_codes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) {
+      setInviteCodesList(data);
+    }
+    setLoadingInvites(false);
+  };
+
   useEffect(() => {
     if (activeTab === 'manage') {
       fetchManagePosts();
+    } else if (activeTab === 'invites') {
+      fetchInviteCodes();
     }
   }, [activeTab]);
+
+  const handleGenerateInviteCode = async () => {
+    setGeneratingCode(true);
+    const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newCode = `GT08-${randomChars}`;
+
+    const { error } = await supabase.from('invite_codes').insert({
+      code: newCode,
+      is_active: true,
+      created_by: session?.user.id
+    });
+
+    if (error) {
+      toast.error('Erro ao gerar código de convite: ' + error.message);
+    } else {
+      toast.success(`Código ${newCode} gerado com sucesso!`);
+      fetchInviteCodes();
+    }
+    setGeneratingCode(false);
+  };
+
+  const handleToggleCodeActive = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('invite_codes')
+      .update({ is_active: !currentStatus })
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Erro ao alterar status do código.');
+    } else {
+      toast.success(currentStatus ? 'Código desativado.' : 'Código reativado.');
+      fetchInviteCodes();
+    }
+  };
 
   const handleDeletePost = async (id: number) => {
     if (!window.confirm('Tem certeza que deseja excluir esta publicação?')) return;
@@ -431,6 +497,10 @@ export default function AdminDashboard() {
           <button onClick={() => setActiveTab('profile')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === 'profile' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
             <User className="w-4 h-4" /> Meu Perfil
+          </button>
+          <button onClick={() => setActiveTab('invites')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === 'invites' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+            <Key className="w-4 h-4" /> Convites & Equipe
           </button>
         </div>
 
@@ -664,6 +734,104 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {/* Aba: Convites & Equipe */}
+        {activeTab === 'invites' && (
+          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <Key className="w-5 h-5 text-blue-600" />
+                  Gerenciador de Convites da Equipe
+                </h2>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                  Gere códigos de acesso individuais para novos parceiros e bolsistas do projeto.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleGenerateInviteCode}
+                disabled={generatingCode}
+                className="w-full sm:w-auto h-11 px-5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-50 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{generatingCode ? 'Gerando...' : 'Gerar Novo Convite'}</span>
+              </button>
+            </div>
+
+            {loadingInvites ? (
+              <div className="p-8 text-center text-slate-400 text-sm">Carregando convites...</div>
+            ) : inviteCodesList.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-sm">
+                Nenhum código de convite encontrado. Clique no botão acima para gerar o primeiro!
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {inviteCodesList.map((invite) => {
+                  const isAvailable = invite.is_active && !invite.used_at;
+                  return (
+                    <div 
+                      key={invite.id} 
+                      className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${isAvailable ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50/70 border-slate-100 opacity-80'}`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-base font-black tracking-wider bg-slate-100 text-slate-800 px-3 py-1 rounded-lg border border-slate-200">
+                            {invite.code}
+                          </span>
+                          {isAvailable ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Disponível
+                            </span>
+                          ) : invite.used_at ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                              Utilizado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                              Inativo
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {invite.used_by_email ? (
+                            <span>Utilizado por: <strong className="text-slate-700">{invite.used_by_email}</strong></span>
+                          ) : (
+                            <span>Criado em: {new Date(invite.created_at).toLocaleDateString('pt-BR')}</span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        {isAvailable && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(invite.code);
+                              toast.success(`Código ${invite.code} copiado!`);
+                            }}
+                            className="flex-1 sm:flex-initial h-9 px-3 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" /> Copiar Código
+                          </button>
+                        )}
+                        {!invite.used_at && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCodeActive(invite.id, invite.is_active)}
+                            className={`h-9 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${invite.is_active ? 'text-red-600 hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                          >
+                            {invite.is_active ? 'Desativar' : 'Reativar'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
